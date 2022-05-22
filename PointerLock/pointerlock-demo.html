@@ -97,18 +97,29 @@
         }
 
         /**
-         * Request pointer lock.
+         * Request pointer lock
          *
          * This is called as the handler of a user-initiated event (a `click`
-         * in this demo). According to the specification, pointer lock cannot
-         * be obtained successfully except in response to user action, or when
-         * 
+         * in this demo). Pointer lock rules differ by browser, but generally
+         * must be initiated by a user action.
+         *
+         * The browser should fire an event, either `pointerlockchange` or
+         * `pointerlockerror`, as a result of this function.
          */
         function getLock(evt) {
             evt.preventDefault();
             evt.target.requestPointerLock();
         }
 
+        /**
+         * Release pointer lock
+         *
+         * This is called as the handler of a user-initiated event (a `click`
+         * in this demo). The user can also release pointer lock themselves by
+         * using a "default unlock gesture" (the Esc key on systems with
+         * keyboard input), in which case this function is not called. In both
+         * cases, the browser should fire a `pointerlockchange` event.
+         */
         function yieldLock(evt) {
             evt.preventDefault();
 
@@ -116,9 +127,26 @@
             document.exitPointerLock();
         }
 
+        /**
+         * Toggle pointer lock
+         *
+         * This is called as the handler of a `pointerlockchange` event, which
+         * is generated both when acquiring pointer lock and when releasing it.
+         * The two possibilities are distinguished by checking whether pointer
+         * lock is held by the expected element (or one of its descendants) or
+         * not.
+         *
+         * When pointer lock is acquired, the visual "no pointer lock" indicator
+         * is hidden. The `click` event handler releases pointer lock, rather
+         * than requesting it. A `pointermove` event handler is added.
+         *
+         * When pointer lock is released, the reverse of the above happens.
+         */
         function togglePointerLock(evt) {
+            // Is this from acquiring pointer lock, or releasing it?
             if (pointerLockDemo.contains(document.pointerLockElement)) {
-                // Pointer lock acquired. Activate mouse movement tracking.
+                // Pointer lock acquired. Activate mouse movement tracking and
+                // hide the "no pointer lock" indicator.
                 document.addEventListener("pointermove", changePosition);
                 document.getElementById("no").classList.remove("visible");
 
@@ -129,7 +157,8 @@
                 pointerLockDemo.removeEventListener("click", getLock);
                 pointerLockDemo.addEventListener("click", yieldLock);
             } else {
-                // Pointer lock released. Deactivate mouse movement tracking.
+                // Pointer lock released. Deactivate mouse movement tracking
+                // and show the "no pointer lock" indicator.
                 document.removeEventListener("pointermove", changePosition);
                 document.getElementById("no").classList.add("visible");
 
@@ -142,10 +171,22 @@
             }
         }
 
+        /**
+         * Log an error in acquiring pointer lock
+         *
+         * This is called as the handler of a `pointerlockerror` event. It does
+         * nothing except log the error to the console.
+         */
         function logPointerLockError(evt) {
             console.log("A pointer lock request failed.");
         }
 
+        /**
+         * Set up the demo
+         *
+         * This is called as the handler of a `DOMContentLoaded` event. It
+         * initialises variables and sets up the event handlers.
+         */
         function setup() {
             x = 0;
             y = 0;
@@ -157,9 +198,7 @@
             window.addEventListener("pointerlockerror", logPointerLockError);
         }
 
-        document.addEventListener("DOMContentLoaded", function () {
-            setup();
-        });
+        document.addEventListener("DOMContentLoaded", setup);
     </script>
 </head>
 
