@@ -1,0 +1,233 @@
+<!DOCTYPE html>
+<!--
+ Copyright (c) 2022 Tim Pederick
+ 
+ Permission is hereby granted, free of charge, to any person obtaining a copy
+ of this software and associated documentation files (the "Software"), to deal
+ in the Software without restriction, including without limitation the rights
+ to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+ copies of the Software, and to permit persons to whom the Software is
+ furnished to do so, subject to the following conditions:
+ 
+ The above copyright notice and this permission notice shall be included in all
+ copies or substantial portions of the Software.
+ 
+ THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+ SOFTWARE.
+-->
+
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <title>Testing the Gamepad API</title>
+    <style>
+        body {
+            background-color: #0c0c1a;
+            color: white;
+            display: grid;
+            place-items: center;
+        }
+        svg {
+            background-color: #b4b4c0;
+        }
+        #gamepad * {
+            fill: #12412e;
+            stroke: black;
+            stroke-width: 8px;
+        }
+        #gamepad .light * {
+            fill: #217855;
+        }
+        #gamepad #buttons *,
+        #no {
+            fill: none;
+            stroke: none;
+        }
+        #gamepad #buttons *.visible {
+            fill: #333333;
+            stroke: none;
+        }
+        #gamepad #buttons *.visible.active,
+        #no.visible {
+            fill: #ed2939;
+        }
+    </style>
+    <script>
+        var requestID;
+        var mainGamepadIndex;
+
+        function addGamepad(evt) {
+            let logMsgAdditional = "";
+            // Was there a gamepad already in use as the main one?
+            if (mainGamepadIndex === undefined) {
+                // No! Save this one as the main gamepad, and start polling it.
+                mainGamepadIndex = evt.gamepad.index;
+                requestID = window.requestAnimationFrame(pollGamepad);
+
+                logMsgAdditional = " Set as main gamepad.";
+            }
+            console.log("Gamepad %d detected (%s, %d buttons, %d axes).%s",
+                        evt.gamepad.index, evt.gamepad.id,
+                        evt.gamepad.buttons.length, evt.gamepad.axes.length,
+                        logMsgAdditional);
+        }
+
+        function removeGamepad(evt) {
+            let logMsgAdditional = "";
+            // Was this gamepad in use as the main one?
+            if (mainGamepadIndex === evt.gamepad.index) {
+                // Yes! Take the first remaining one (in index order) as the
+                // new main gamepad.
+                let oldMainGamepadIndex = mainGamepadIndex;
+                mainGamepadIndex = undefined;
+                let gamepads = navigator.getGamepads();
+                for (let index = 0; index < gamepads.length; index++) {
+                    if (index != oldMainGamepadIndex && gamepads[index]) {
+                        mainGamepadIndex = index;
+                        break;
+                    }
+                }
+
+                if (mainGamepadIndex === undefined) {
+                    // Redraw the gamepad one last time, but then stop polling it.
+                    pollGamepad();
+                    window.cancelAnimationFrame(requestID);
+                    logMsgAdditional = " No other gamepads detected.";
+                } else {
+                    logMsgAdditional = (" Gamepad " + mainGamepadIndex +
+                                        " promoted to main.");
+                }
+            }
+            console.log("Gamepad %d removed (%s).%s",
+                        evt.gamepad.index, evt.gamepad.id, logMsgAdditional);
+        }
+
+        function pollGamepad() {
+            // Update the state of the buttons/sticks.
+            let no = document.getElementById("no");
+            let buttons = document.getElementById("buttons").children;
+
+            if (mainGamepadIndex === undefined) {
+                no.classList.add("visible");
+                for (const button of buttons) {
+                    button.classList.remove("visible");
+                }
+            } else {
+                no.classList.remove("visible");
+
+                const STICK_A = 10, STICK_B = 11, OFFSET_SCALE = 16;
+                let mainGamepad = navigator.getGamepads()[mainGamepadIndex];
+                let button, transform;
+
+                for (let n = 0;
+                     mainGamepad !== undefined && n < buttons.length;
+                     n++) {
+                    button = buttons[n];
+                    console.assert(button.id == "button-" + n);
+
+                    if (n >= mainGamepad.buttons.length) {
+                        button.classList.remove("visible");
+                    } else {
+                        button.classList.add("visible");
+                        if (mainGamepad.buttons[n].pressed) {
+                            button.classList.add("active");
+                        } else {
+                            button.classList.remove("active");
+                        }
+
+                        if (n == STICK_A || n == STICK_B) {
+                            // Translate by the scaled value of the
+                            // corresponding gampad axes.
+                            let xAxis = (n == STICK_A ? 0 : 2);
+                            let yAxis = (n == STICK_A ? 1 : 3);
+
+                            transform = button.ownerSVGElement.createSVGTransform();
+                            transform.setTranslate(
+                                OFFSET_SCALE * mainGamepad.axes[xAxis],
+                                OFFSET_SCALE * mainGamepad.axes[yAxis]
+                            );
+                            button.transform.baseVal.initialize(transform);
+                        }
+                    }
+                }
+            }
+
+            // Request that the gamepad be polled again next frame.
+            requestID = window.requestAnimationFrame(pollGamepad);
+        }
+
+        function setup() {
+            // Set up event listeners.
+            window.addEventListener("gamepadconnected", addGamepad);
+            window.addEventListener("gamepaddisconnected", removeGamepad);
+        }
+
+        document.addEventListener("DOMContentLoaded", function () {
+            setup();
+        });
+    </script>
+</head>
+
+<body>
+    <svg width="640" height="480">
+        <g id="gamepad">
+            <g class="dark">
+                <rect x="232" y="110" width="176" height="96"/>
+                <rect x="228" y="248" width="184" height="64"/>
+                <path d="M232.5,175 L249.5,175 249.5,110 233.3,88.4"/>
+                <path d="M406.7,88.4 L390.5,110 390.5,175 407.5,175"/>
+                <path id="handgrip" transform="rotate(15 192,220)"
+                      d="M264,220 L120,220 l0,104 a72,72 0 0,0 144,0 Z"/>
+                <use href="#handgrip"
+                     transform="translate(256,0) rotate(-30 192,220)"/>
+            </g>
+            <g class="light">
+                <path d="M134.5,175 L168.5,90 232.5,90 232.5,175 Z"/>
+                <path d="M505.5,175 L471.5,90 407.5,90 407.5,175 Z"/>
+                <rect x="228" y="174" width="184" height="106"/>
+                <circle cx="192" cy="220" r="72"/>
+                <circle cx="448" cy="220" r="72"/>
+                <circle cx="256" cy="292" r="40"/>
+                <circle cx="384" cy="292" r="40"/>
+            </g>
+            <g id="buttons">
+                <circle id="button-0" cx="448" cy="255" r="17"/>
+                <circle id="button-1" cx="483" cy="220" r="17"/>
+                <circle id="button-2" cx="413" cy="220" r="17"/>
+                <circle id="button-3" cx="448" cy="185" r="17"/>
+                <path id="button-4"
+                      d="M158.9,140 L222.5,140 222.5,122 166.1,122 Z"/>
+                <path id="button-5"
+                      d="M473.9,122 L417.5,122 417.5,140 481.1,140 Z"/>
+                <path id="button-6"
+                      d="M168.5,116 L222.5,116 222.5,98 175.7,98 Z"/>
+                <path id="button-7"
+                      d="M464.3,98 L417.5,98 417.5,116 471.5,116 Z"/>
+                <rect id="button-8" x="276.5" y="222" width="36" height="24"/>
+                <rect id="button-9" x="328.5" y="222" width="36" height="24"/>
+                <circle id="button-10" cx="256" cy="292" r="28"/>
+                <circle id="button-11" cx="384" cy="292" r="28"/>
+                <path id="button-12"
+                      d="M175,168 L175,196 192,213 209,196 209,168 Z"/>
+                <path id="button-13"
+                      d="M209,272 L209,244 192,227 175,244 175,272 Z"/>
+                <path id="button-14"
+                      d="M140,203 L140,237 168,237 185,220 168,203 Z"/>
+                <path id="button-15"
+                      d="M244,203 L216,203 199,220 216,237 244,237 Z"/>
+                <circle id="button-16" cx="320" cy="198" r="16"/>
+            </g>
+        </g>
+        <path id="no" class="visible"
+              transform="rotate(45 320,240)" fill-rule="evenodd"
+              d="M320,370 a130,130 0 0,0 0,-260 a130,130 0 0,0 0,260 Z
+                 M216.521,229.6 a104,104 0 0,1 206.957,0 Z
+                 M423.478,250.4 a104,104 0 0,1 -206.957,0 Z"/>
+    </svg>
+</body>
+</html>
