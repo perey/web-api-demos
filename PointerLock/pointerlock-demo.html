@@ -1,0 +1,379 @@
+<!DOCTYPE html>
+<!--
+ Copyright (c) 2022 Tim Pederick
+ 
+ Permission is hereby granted, free of charge, to any person obtaining a copy
+ of this software and associated documentation files (the "Software"), to deal
+ in the Software without restriction, including without limitation the rights
+ to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+ copies of the Software, and to permit persons to whom the Software is
+ furnished to do so, subject to the following conditions:
+ 
+ The above copyright notice and this permission notice shall be included in all
+ copies or substantial portions of the Software.
+ 
+ THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+ SOFTWARE.
+-->
+
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <title>A demonstration of the Pointer Lock API</title>
+    <style>
+        body {
+            background-color: #0c0c1a;
+            color: white;
+            display: grid;
+            place-items: center;
+        }
+        svg {
+            background-color: #b4b4c0;
+        }
+        path {
+            fill: none;
+            stroke: black;
+            stroke-width: 1px;
+        }
+        path.indicator {
+            stroke: #ed2939;
+            stroke-width: 2px;
+        }
+        text {
+            fill: black;
+            font-size: 16px;
+            text-anchor: middle;
+        }
+        text.minor {
+            font-size: 10px;
+        }
+        #altitude text {
+            text-anchor: end;
+        }
+        #no {
+            fill: none;
+            stroke: none;
+        }
+        #no.visible {
+            fill: #ed2939;
+        }
+    </style>
+    <script>
+        const SCALE_DEG_TO_PX = 4;
+        const X_WRAP = 360 * SCALE_DEG_TO_PX;
+        const Y_LIMIT = 90 * SCALE_DEG_TO_PX;
+
+        var pointerLockDemo;
+        var x, y;
+
+        /**
+         * Change the position displayed on the alt-az indicator
+         *
+         * This is called as the handler of a `pointermove` event while pointer
+         * lock is active.
+         */
+        function changePosition(evt) {
+            // Update the notional position of the pointer.
+            x = (x + evt.movementX) % X_WRAP;
+            y = Math.max(Math.min((y + evt.movementY), Y_LIMIT), -Y_LIMIT);
+
+            // Show this position on the alt-az indicator.
+            setTranslate(document.getElementById("offset-h"), x, 0);
+            setTranslate(document.getElementById("offset-v"), 0, y);
+        }
+
+        /**
+         * Helper function to set a translation on an SVG element
+         */
+        function setTranslate(el, x, y) {
+            let transform = el.ownerSVGElement.createSVGTransform();
+            transform.setTranslate(x, y);
+            el.transform.baseVal.initialize(transform);
+        }
+
+        /**
+         * Request pointer lock.
+         *
+         * This is called as the handler of a user-initiated event (a `click`
+         * in this demo). According to the specification, pointer lock cannot
+         * be obtained successfully except in response to user action, or when
+         * 
+         */
+        function getLock(evt) {
+            evt.preventDefault();
+            evt.target.requestPointerLock();
+        }
+
+        function yieldLock(evt) {
+            evt.preventDefault();
+
+            console.log("Yielding pointer lock...");
+            document.exitPointerLock();
+        }
+
+        function togglePointerLock(evt) {
+            if (pointerLockDemo.contains(document.pointerLockElement)) {
+                // Pointer lock acquired. Activate mouse movement tracking.
+                document.addEventListener("pointermove", changePosition);
+                document.getElementById("no").classList.remove("visible");
+
+                console.log("Pointer locked to " + document.pointerLockElement +
+                            ' "' + document.pointerLockElement?.id + '"');
+
+                // Switch click handling over so it yields the lock.
+                pointerLockDemo.removeEventListener("click", getLock);
+                pointerLockDemo.addEventListener("click", yieldLock);
+            } else {
+                // Pointer lock released. Deactivate mouse movement tracking.
+                document.removeEventListener("pointermove", changePosition);
+                document.getElementById("no").classList.add("visible");
+
+                console.log("Pointer unlocked; lock element is now " +
+                            document.pointerLockElement);
+
+                // (Attempt to) re-acquire the lock when the demo is clicked.
+                pointerLockDemo.removeEventListener("click", yieldLock);
+                pointerLockDemo.addEventListener("click", getLock);
+            }
+        }
+
+        function logPointerLockError(evt) {
+            console.log("A pointer lock request failed.");
+        }
+
+        function setup() {
+            x = 0;
+            y = 0;
+
+            // Set up event listeners.
+            pointerLockDemo = document.getElementById("pointer-lock-demo");
+            pointerLockDemo.addEventListener("click", getLock);
+            window.addEventListener("pointerlockchange", togglePointerLock);
+            window.addEventListener("pointerlockerror", logPointerLockError);
+        }
+
+        document.addEventListener("DOMContentLoaded", function () {
+            setup();
+        });
+    </script>
+</head>
+
+<body>
+    <svg id="pointer-lock-demo" width="640" height="480" viewBox="-320 -240 640 480">
+        <defs>
+            <clipPath id="clipbox">
+                <rect x="-50" y="-95" width="100" height="190"/>
+            </clipPath>
+        </defs>
+        <g id="horizontal-motion" transform="translate(0,100)">
+            <path class="indicator"
+                  d="M-20,-6 v-4 h14 l6,6 6,-6 h14 v4
+                     M-20,34 v4 h14 l6,-6 6,6 h14 v-4"/>
+            <g id="offset-h" transform="translate(0,0)">
+                <g id="azimuth">
+                    <path id="azimuth-scale"
+                          d="M0,0 v10 m4,-10 v5 m4,-5 v5 m4,-5 v5 m4,-5 v5
+                             m4,-5 v8 m4,-8 v5 m4,-5 v5 m4,-5 v5 m4,-5 v5
+                             m4,-5 v8 m4,-8 v5 m4,-5 v5 m4,-5 v5 m4,-5 v5
+                             m4,-5 v8 m4,-8 v5 m4,-5 v5 m4,-5 v5 m4,-5 v5
+                             m4,-5 v8 m4,-8 v5 m4,-5 v5 m4,-5 v5 m4,-5 v5
+                             m4,-5 v8 m4,-8 v5 m4,-5 v5 m4,-5 v5 m4,-5 v5
+                             m4,-5 v8 m4,-8 v5 m4,-5 v5 m4,-5 v5 m4,-5 v5
+                             m4,-5 v8 m4,-8 v5 m4,-5 v5 m4,-5 v5 m4,-5 v5
+                             m4,-5 v8 m4,-8 v5 m4,-5 v5 m4,-5 v5 m4,-5 v5
+                             m4,-5 v8 m4,-8 v5 m4,-5 v5 m4,-5 v5 m4,-5 v5
+                             m4,-5 v8 m4,-8 v5 m4,-5 v5 m4,-5 v5 m4,-5 v5
+                             m4,-5 v8 m4,-8 v5 m4,-5 v5 m4,-5 v5 m4,-5 v5
+                             m4,-5 v8 m4,-8 v5 m4,-5 v5 m4,-5 v5 m4,-5 v5
+                             m4,-5 v8 m4,-8 v5 m4,-5 v5 m4,-5 v5 m4,-5 v5
+                             m4,-5 v8 m4,-8 v5 m4,-5 v5 m4,-5 v5 m4,-5 v5
+                             m4,-5 v8 m4,-8 v5 m4,-5 v5 m4,-5 v5 m4,-5 v5
+                             m4,-5 v8 m4,-8 v5 m4,-5 v5 m4,-5 v5 m4,-5 v5
+                             m4,-5 v8 m4,-8 v5 m4,-5 v5 m4,-5 v5 m4,-5 v5
+                             m4,-5 v10 m4,-10 v5 m4,-5 v5 m4,-5 v5 m4,-5 v5
+                             m4,-5 v8 m4,-8 v5 m4,-5 v5 m4,-5 v5 m4,-5 v5
+                             m4,-5 v8 m4,-8 v5 m4,-5 v5 m4,-5 v5 m4,-5 v5
+                             m4,-5 v8 m4,-8 v5 m4,-5 v5 m4,-5 v5 m4,-5 v5
+                             m4,-5 v8 m4,-8 v5 m4,-5 v5 m4,-5 v5 m4,-5 v5
+                             m4,-5 v8 m4,-8 v5 m4,-5 v5 m4,-5 v5 m4,-5 v5
+                             m4,-5 v8 m4,-8 v5 m4,-5 v5 m4,-5 v5 m4,-5 v5
+                             m4,-5 v8 m4,-8 v5 m4,-5 v5 m4,-5 v5 m4,-5 v5
+                             m4,-5 v8 m4,-8 v5 m4,-5 v5 m4,-5 v5 m4,-5 v5
+                             m4,-5 v8 m4,-8 v5 m4,-5 v5 m4,-5 v5 m4,-5 v5
+                             m4,-5 v8 m4,-8 v5 m4,-5 v5 m4,-5 v5 m4,-5 v5
+                             m4,-5 v8 m4,-8 v5 m4,-5 v5 m4,-5 v5 m4,-5 v5
+                             m4,-5 v8 m4,-8 v5 m4,-5 v5 m4,-5 v5 m4,-5 v5
+                             m4,-5 v8 m4,-8 v5 m4,-5 v5 m4,-5 v5 m4,-5 v5
+                             m4,-5 v8 m4,-8 v5 m4,-5 v5 m4,-5 v5 m4,-5 v5
+                             m4,-5 v8 m4,-8 v5 m4,-5 v5 m4,-5 v5 m4,-5 v5
+                             m4,-5 v8 m4,-8 v5 m4,-5 v5 m4,-5 v5 m4,-5 v5
+                             m4,-5 v8 m4,-8 v5 m4,-5 v5 m4,-5 v5 m4,-5 v5
+                             m4,-5 v10 m4,-10 v5 m4,-5 v5 m4,-5 v5 m4,-5 v5
+                             m4,-5 v8 m4,-8 v5 m4,-5 v5 m4,-5 v5 m4,-5 v5
+                             m4,-5 v8 m4,-8 v5 m4,-5 v5 m4,-5 v5 m4,-5 v5
+                             m4,-5 v8 m4,-8 v5 m4,-5 v5 m4,-5 v5 m4,-5 v5
+                             m4,-5 v8 m4,-8 v5 m4,-5 v5 m4,-5 v5 m4,-5 v5
+                             m4,-5 v8 m4,-8 v5 m4,-5 v5 m4,-5 v5 m4,-5 v5
+                             m4,-5 v8 m4,-8 v5 m4,-5 v5 m4,-5 v5 m4,-5 v5
+                             m4,-5 v8 m4,-8 v5 m4,-5 v5 m4,-5 v5 m4,-5 v5
+                             m4,-5 v8 m4,-8 v5 m4,-5 v5 m4,-5 v5 m4,-5 v5
+                             m4,-5 v8 m4,-8 v5 m4,-5 v5 m4,-5 v5 m4,-5 v5
+                             m4,-5 v8 m4,-8 v5 m4,-5 v5 m4,-5 v5 m4,-5 v5
+                             m4,-5 v8 m4,-8 v5 m4,-5 v5 m4,-5 v5 m4,-5 v5
+                             m4,-5 v8 m4,-8 v5 m4,-5 v5 m4,-5 v5 m4,-5 v5
+                             m4,-5 v8 m4,-8 v5 m4,-5 v5 m4,-5 v5 m4,-5 v5
+                             m4,-5 v8 m4,-8 v5 m4,-5 v5 m4,-5 v5 m4,-5 v5
+                             m4,-5 v8 m4,-8 v5 m4,-5 v5 m4,-5 v5 m4,-5 v5
+                             m4,-5 v8 m4,-8 v5 m4,-5 v5 m4,-5 v5 m4,-5 v5
+                             m4,-5 v8 m4,-8 v5 m4,-5 v5 m4,-5 v5 m4,-5 v5
+                             m4,-5 v10 m4,-10 v5 m4,-5 v5 m4,-5 v5 m4,-5 v5
+                             m4,-5 v8 m4,-8 v5 m4,-5 v5 m4,-5 v5 m4,-5 v5
+                             m4,-5 v8 m4,-8 v5 m4,-5 v5 m4,-5 v5 m4,-5 v5
+                             m4,-5 v8 m4,-8 v5 m4,-5 v5 m4,-5 v5 m4,-5 v5
+                             m4,-5 v8 m4,-8 v5 m4,-5 v5 m4,-5 v5 m4,-5 v5
+                             m4,-5 v8 m4,-8 v5 m4,-5 v5 m4,-5 v5 m4,-5 v5
+                             m4,-5 v8 m4,-8 v5 m4,-5 v5 m4,-5 v5 m4,-5 v5
+                             m4,-5 v8 m4,-8 v5 m4,-5 v5 m4,-5 v5 m4,-5 v5
+                             m4,-5 v8 m4,-8 v5 m4,-5 v5 m4,-5 v5 m4,-5 v5
+                             m4,-5 v8 m4,-8 v5 m4,-5 v5 m4,-5 v5 m4,-5 v5
+                             m4,-5 v8 m4,-8 v5 m4,-5 v5 m4,-5 v5 m4,-5 v5
+                             m4,-5 v8 m4,-8 v5 m4,-5 v5 m4,-5 v5 m4,-5 v5
+                             m4,-5 v8 m4,-8 v5 m4,-5 v5 m4,-5 v5 m4,-5 v5
+                             m4,-5 v8 m4,-8 v5 m4,-5 v5 m4,-5 v5 m4,-5 v5
+                             m4,-5 v8 m4,-8 v5 m4,-5 v5 m4,-5 v5 m4,-5 v5
+                             m4,-5 v8 m4,-8 v5 m4,-5 v5 m4,-5 v5 m4,-5 v5
+                             m4,-5 v8 m4,-8 v5 m4,-5 v5 m4,-5 v5 m4,-5 v5
+                             m4,-5 v8 m4,-8 v5 m4,-5 v5 m4,-5 v5 m4,-5 v5
+                             M0,0 H1440"/>
+                    <g id="azimuth-labels">
+                        <text class="major" x="0" y="26">0</text>
+                        <text class="minor" x="60" y="20">15</text>
+                        <text class="minor" x="120" y="20">30</text>
+                        <text class="minor" x="180" y="20">45</text>
+                        <text class="minor" x="240" y="20">60</text>
+                        <text class="minor" x="300" y="20">75</text>
+                        <text class="major" x="360" y="26">90</text>
+                        <text class="minor" x="420" y="20">105</text>
+                        <text class="minor" x="480" y="20">120</text>
+                        <text class="minor" x="540" y="20">135</text>
+                        <text class="minor" x="600" y="20">150</text>
+                        <text class="minor" x="660" y="20">165</text>
+                        <text class="major" x="720" y="26">180</text>
+                        <text class="minor" x="780" y="20">195</text>
+                        <text class="minor" x="840" y="20">210</text>
+                        <text class="minor" x="900" y="20">225</text>
+                        <text class="minor" x="960" y="20">240</text>
+                        <text class="minor" x="1020" y="20">255</text>
+                        <text class="major" x="1080" y="26">270</text>
+                        <text class="minor" x="1140" y="20">285</text>
+                        <text class="minor" x="1200" y="20">300</text>
+                        <text class="minor" x="1260" y="20">315</text>
+                        <text class="minor" x="1320" y="20">330</text>
+                        <text class="minor" x="1380" y="20">345</text>
+                    </g>
+                </g>
+                <use href="#azimuth" x="-2880"/>
+                <use href="#azimuth" x="-1440"/>
+                <use href="#azimuth" x="1440"/>
+            </g>
+        </g>
+        <g id="vertical-motion" transform="translate(0,-80)" clip-path="url(#clipbox)">
+            <path class="indicator"
+                  d="M-48,-8.7 l15,8.7 -15,8.7 z
+                     M-30,0 h7
+                     M43,0 h5"/>
+            <g id="offset-v" transform="translate(0,0)">
+                <g id="altitude">
+                    <path id="altitude-scale" transform="translate(-20,0)"
+                          d="M0,-360 H30 M0,-356 H5 M0,-352 H5 M0,-348 H5 M0,-344 H5
+                             M0,-340 H20 M0,-336 H5 M0,-332 H5 M0,-328 H5 M0,-324 H5
+                             M0,-320 H20 M0,-316 H5 M0,-312 H5 M0,-308 H5 M0,-304 H5
+                             M0,-300 H30 M0,-296 H5 M0,-292 H5 M0,-288 H5 M0,-284 H5
+                             M0,-280 H20 M0,-276 H5 M0,-272 H5 M0,-268 H5 M0,-264 H5
+                             M0,-260 H20 M0,-256 H5 M0,-252 H5 M0,-248 H5 M0,-244 H5
+                             M0,-240 H30 M0,-236 H5 M0,-232 H5 M0,-228 H5 M0,-224 H5
+                             M0,-220 H20 M0,-216 H5 M0,-212 H5 M0,-208 H5 M0,-204 H5
+                             M0,-200 H20 M0,-196 H5 M0,-192 H5 M0,-188 H5 M0,-184 H5
+                             M0,-180 H30 M0,-176 H5 M0,-172 H5 M0,-168 H5 M0,-164 H5
+                             M0,-160 H20 M0,-156 H5 M0,-152 H5 M0,-148 H5 M0,-144 H5
+                             M0,-140 H20 M0,-136 H5 M0,-132 H5 M0,-128 H5 M0,-124 H5
+                             M0,-120 H30 M0,-116 H5 M0,-112 H5 M0,-108 H5 M0,-104 H5
+                             M0,-100 H20 M0,-96 H5 M0,-92 H5 M0,-88 H5 M0,-84 H5
+                             M0,-80 H20 M0,-76 H5 M0,-72 H5 M0,-68 H5 M0,-64 H5
+                             M0,-60 H30 M0,-56 H5 M0,-52 H5 M0,-48 H5 M0,-44 H5
+                             M0,-40 H20 M0,-36 H5 M0,-32 H5 M0,-28 H5 M0,-24 H5
+                             M0,-20 H20 M0,-16 H5 M0,-12 H5 M0,-8 H5 M0,-4 H5
+                             M0,0 H30 M0,4 H5 M0,8 H5 M0,12 H5 M0,16 H5
+                             M0,20 H20 M0,24 H5 M0,28 H5 M0,32 H5 M0,36 H5
+                             M0,40 H20 M0,44 H5 M0,48 H5 M0,52 H5 M0,56 H5
+                             M0,60 H30 M0,64 H5 M0,68 H5 M0,72 H5 M0,76 H5
+                             M0,80 H20 M0,84 H5 M0,88 H5 M0,92 H5 M0,96 H5
+                             M0,100 H20 M0,104 H5 M0,108 H5 M0,112 H5 M0,116 H5
+                             M0,120 H30 M0,124 H5 M0,128 H5 M0,132 H5 M0,136 H5
+                             M0,140 H20 M0,144 H5 M0,148 H5 M0,152 H5 M0,156 H5
+                             M0,160 H20 M0,164 H5 M0,168 H5 M0,172 H5 M0,176 H5
+                             M0,180 H30 M0,184 H5 M0,188 H5 M0,192 H5 M0,196 H5
+                             M0,200 H20 M0,204 H5 M0,208 H5 M0,212 H5 M0,216 H5
+                             M0,220 H20 M0,224 H5 M0,228 H5 M0,232 H5 M0,236 H5
+                             M0,240 H30 M0,244 H5 M0,248 H5 M0,252 H5 M0,256 H5
+                             M0,260 H20 M0,264 H5 M0,268 H5 M0,272 H5 M0,276 H5
+                             M0,280 H20 M0,284 H5 M0,288 H5 M0,292 H5 M0,296 H5
+                             M0,300 H30 M0,304 H5 M0,308 H5 M0,312 H5 M0,316 H5
+                             M0,320 H20 M0,324 H5 M0,328 H5 M0,332 H5 M0,336 H5
+                             M0,340 H20 M0,344 H5 M0,348 H5 M0,352 H5 M0,356 H5
+                             M0,360 H30"/>
+                    <g id="altitude-labels">
+                        <text class="major" x="40" y="-356">90</text>
+                        <text class="minor" x="40" y="-336">85</text>
+                        <text class="minor" x="40" y="-316">80</text>
+                        <text class="major" x="40" y="-296">75</text>
+                        <text class="minor" x="40" y="-276">70</text>
+                        <text class="minor" x="40" y="-256">65</text>
+                        <text class="major" x="40" y="-236">60</text>
+                        <text class="minor" x="40" y="-216">55</text>
+                        <text class="minor" x="40" y="-196">50</text>
+                        <text class="major" x="40" y="-176">45</text>
+                        <text class="minor" x="40" y="-156">40</text>
+                        <text class="minor" x="40" y="-136">35</text>
+                        <text class="major" x="40" y="-116">30</text>
+                        <text class="minor" x="40" y="-96">25</text>
+                        <text class="minor" x="40" y="-76">20</text>
+                        <text class="major" x="40" y="-56">15</text>
+                        <text class="minor" x="40" y="-36">10</text>
+                        <text class="minor" x="40" y="-16">5</text>
+                        <text class="major" x="40" y="4">0</text>
+                        <text class="minor" x="40" y="24">−5</text>
+                        <text class="minor" x="40" y="44">−10</text>
+                        <text class="major" x="40" y="64">−15</text>
+                        <text class="minor" x="40" y="84">−20</text>
+                        <text class="minor" x="40" y="104">−25</text>
+                        <text class="major" x="40" y="124">−30</text>
+                        <text class="minor" x="40" y="144">−35</text>
+                        <text class="minor" x="40" y="164">−40</text>
+                        <text class="major" x="40" y="184">−45</text>
+                        <text class="minor" x="40" y="204">−50</text>
+                        <text class="minor" x="40" y="224">−55</text>
+                        <text class="major" x="40" y="244">−60</text>
+                        <text class="minor" x="40" y="264">−65</text>
+                        <text class="minor" x="40" y="284">−70</text>
+                        <text class="major" x="40" y="304">−75</text>
+                        <text class="minor" x="40" y="324">−80</text>
+                        <text class="minor" x="40" y="344">−85</text>
+                        <text class="major" x="40" y="364">−90</text>
+                    </g>
+                </g>
+            </g>
+        </g>
+        <path id="no" class="visible"
+              transform="rotate(45)" fill-rule="evenodd"
+              d="M0,130 a130,130 0 0,0 0,-260 a130,130 0 0,0 0,260 Z
+                 M-103.478,-10.4 a104,104 0 0,1 206.957,0 Z
+                 M103.478,10.4 a104,104 0 0,1 -206.957,0 Z"/>
+    </svg>
+</body>
+</html>
