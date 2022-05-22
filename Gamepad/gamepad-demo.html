@@ -24,7 +24,7 @@
 <html lang="en">
 <head>
     <meta charset="utf-8">
-    <title>Testing the Gamepad API</title>
+    <title>A demonstration of the Gamepad API</title>
     <style>
         body {
             background-color: #0c0c1a;
@@ -58,9 +58,20 @@
         }
     </style>
     <script>
+        const STICK_A = 10, STICK_B = 11;
+        const OFFSET_SCALE = 16;
+
         var requestID;
         var mainGamepadIndex;
 
+        /**
+         * Add a gamepad
+         *
+         * This is called as the handler of a `gamepadconnected` event. It
+         * checks whether another gamepad is already being used as the "main"
+         * one for the demo, and if not, sets this one as "main". It also logs
+         * some information about the gamepad to the console.
+         */
         function addGamepad(evt) {
             let logMsgAdditional = "";
             // Was there a gamepad already in use as the main one?
@@ -77,6 +88,15 @@
                         logMsgAdditional);
         }
 
+        /**
+         * Remove a gamepad
+         *
+         * This is called as the handler of a `gamepaddisconnected` event. It
+         * checks whether the gamepad to remove is in use as the "main" one for
+         * the demo; if so, it promotes another connected gamepad to "main", or
+         * if there are no others, it redraws the display one last time and
+         * then cancels the redraw loop.
+         */
         function removeGamepad(evt) {
             let logMsgAdditional = "";
             // Was this gamepad in use as the main one?
@@ -107,6 +127,22 @@
                         evt.gamepad.index, evt.gamepad.id, logMsgAdditional);
         }
 
+        /**
+         * Check gamepad buttons and axes and show their state
+         *
+         * This is called by requestAnimationFrame, and sets itself to be run
+         * again next frame. However, there is no need to keep calling this
+         * function if there is no gamepad in use; it can be called once to
+         * show the "no gamepad" indicator, and then the next request can be
+         * cancelled (its id is stored in the global requestID).
+         *
+         * If no gamepad is present, all buttons and sticks are hidden and the
+         * "no gamepad" indicator is made visible. If a gamepad is visible, the
+         * "no gamepad" indicator is hidden, and a representation of each
+         * button and stick is made visible. Each button is coloured according
+         * to whether it is pressed, and each stick is moved according to the
+         * state of its axes.
+         */
         function pollGamepad() {
             // Update the state of the buttons/sticks.
             let no = document.getElementById("no");
@@ -120,7 +156,6 @@
             } else {
                 no.classList.remove("visible");
 
-                const STICK_A = 10, STICK_B = 11, OFFSET_SCALE = 16;
                 let mainGamepad = navigator.getGamepads()[mainGamepadIndex];
                 let button, transform;
 
@@ -161,15 +196,19 @@
             requestID = window.requestAnimationFrame(pollGamepad);
         }
 
+        /**
+         * Set up the demo
+         *
+         * This is called as the handler of a `DOMContentLoaded` event. It
+         * initialises variables and sets up the event handlers.
+         */
         function setup() {
             // Set up event listeners.
             window.addEventListener("gamepadconnected", addGamepad);
             window.addEventListener("gamepaddisconnected", removeGamepad);
         }
 
-        document.addEventListener("DOMContentLoaded", function () {
-            setup();
-        });
+        document.addEventListener("DOMContentLoaded", setup);
     </script>
 </head>
 
