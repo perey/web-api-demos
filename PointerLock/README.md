@@ -8,7 +8,7 @@ demonstrates:
 - Requesting pointer lock with `Element.requestPointerLock` in response to user
   action (in this case, a `click` event)
 - Releasing pointer lock, both with `document.exitPointerLock` and with the
-  ["default unlock gesture"](
+  [“default unlock gesture”](
   https://w3c.github.io/pointerlock/#dfn-default-unlock-gesture
   "Definition of &quot;default unlock gesture&quot; in the Pointer Lock specification")
 - Responding to `pointerlockchange` and `pointerlockerror` events
@@ -25,15 +25,32 @@ Future enhancement of the demo might include:
 
 Firefox 100:
 
+- A `pointerlockchange` event listener can be placed on the window or on the
+  document.
 - Attempting to obtain pointer lock without user action (immediately on DOM
   load) gives this error:
   > Request for pointer lock was denied because Element.requestPointerLock()
   > was not called from inside a short running user-generated event handler,
   > and the document is not in full screen.
+  If the browser console has focus, the error is this instead:
+  > Request for pointer lock was denied because the document is not focused.
+- Pointer lock can be reacquired immediately after being released.
+- Right-click is not registered as a `click` event while pointer lock is
+  active.
 
-Chrome 101:
+Chrome 102:
 
+- A `pointerlockchange` event listener must be placed on the document, not the
+  window.
 - Attempting to obtain pointer lock without user action (immediately on DOM
   load) gives this error:
-  > Uncaught (in promise) DOMException: A user gesture is required to request
-  > Pointer Lock.
+  > A user gesture is required to request Pointer Lock.
+  If the browser console has focus, the error is this instead:
+  > The root document of this element is not valid for pointer lock.
+- There is a delay ([apparently 1.25 seconds](
+  https://bugs.chromium.org/p/chromium/issues/detail?id=1127223
+  "Chromium issue 1127223: “requestPointerLock immediately after
+  exitPointerLock fails”")) after releasing lock before it can be reacquired.
+  This appears to only apply when using the unlock gesture, not
+  `exitPointerLock`.
+- Right-click is registered as a `click` event while pointer lock is active.
