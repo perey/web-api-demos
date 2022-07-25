@@ -111,7 +111,7 @@
 
             // Chromium 92+ returns a Promise. Firefox has not moved to match
             // as of 100.
-            const lockResponse = target.requestPointerLock();
+            const lockResponse = evt.target.requestPointerLock();
             if (lockResponse === undefined) {
                 console.log("Pointer lock requested; no feedback.");
                 return;
